@@ -6,31 +6,55 @@ const MAP_WIDTH = 10000;
 const MAP_HEIGHT = 10000;
 const GRID_SIZE = 100; // 100x100のグリッドを持つ
 
+const START_PLAYER_SIZE = 20
+function getScale() {
+    return player.radius > 100 ? 100 / player.radius : 1;
+}
+
 let velocityX = 0;
 let velocityY = 0;
+
+// 線形補間関数
+function lerp(start, end, factor) {
+    return start + (end - start) * factor;
+}
+//シグモイド関数
+function sigmoid(x) {
+    return 1 / (1 + Math.exp(-x));
+}
 
 let player = {
     x: MAP_WIDTH / 2,
     y: MAP_HEIGHT / 2,
-    radius: 30,
+    radius: START_PLAYER_SIZE,
+    targetRadius: START_PLAYER_SIZE,
     color: 'blue',
 };
 
 const enemies = [];
 
+const MAX_SPEED = 10;
+const BASE_RADIUS = 40; // これは中央の値で、この周辺のradiusで速度が最も変動します。
+
 for (let i = 0; i < 50; i++) {
+    const MINIMUM_RADIUS = 10;
+    const RADIUS_RANGE = 60
+    const radius = Math.random() * RADIUS_RANGE + MINIMUM_RADIUS;
+    const speedFactor = sigmoid((BASE_RADIUS - radius) * 0.1); // 0.1はシグモイドの「感度」を調整します。
     enemies.push({
         x: Math.random() * 10000,
         y: Math.random() * 10000,
-        radius: Math.random() * 20 + 30, // 30から50の範囲でランダムな半径
-        color: 'yellow'
+        radius: radius,
+        color: 'yellow',
+        speed: MAX_SPEED * speedFactor,
+        direction: Math.random() * Math.PI * 2
     });
 }
 
 
 
 let foods = [];
-for (let i = 0; i < 200; i++) {
+for (let i = 0; i < 1200; i++) {
     foods.push({
         x: Math.random() * MAP_WIDTH,
         y: Math.random() * MAP_HEIGHT,
@@ -84,12 +108,21 @@ function update() {
 
     drawGrid();
 
+    // 毎フレーム、radiusをtargetRadiusに近づける
+    player.radius = lerp(player.radius, player.targetRadius, 0.05);
+
+    // 差が十分に小さくなったら、radiusを直接targetRadiusに設定
+    if (Math.abs(player.radius - player.targetRadius) < 0.1) {
+        player.radius = player.targetRadius;
+    }
+
     foods.forEach((food, index) => {
         drawCircle(food.x - player.x + canvas.width / 2, food.y - player.y + canvas.height / 2, food.radius, food.color);
 
         if (Math.hypot(player.x - food.x, player.y - food.y) < player.radius) {
             foods.splice(index, 1);
-            player.radius += 1;
+            player.radius += 1; // foodを食べたら、直接radiusを増加
+            player.targetRadius += 1;
         }
     });
 
@@ -98,20 +131,35 @@ function update() {
 
         if (checkCollision(player, enemy)) {
             if (player.radius > enemy.radius) {
-                player.radius += enemy.radius;
+                player.targetRadius += enemy.radius; // targetRadiusを増やす
                 enemies.splice(index, 1);
             } else {
-                // この例では、プレイヤーが敵より小さい場合、ゲームを再起動します。
                 location.reload();
             }
         }
+
+        //move
+        enemy.x += Math.cos(enemy.direction) * enemy.speed;
+        enemy.y += Math.sin(enemy.direction) * enemy.speed;
+
+        // 敵が画面の境界に達したら、方向を反転
+        if (enemy.x < 0 || enemy.x > MAP_WIDTH) {
+            enemy.direction = Math.PI - enemy.direction;
+        }
+        if (enemy.y < 0 || enemy.y > MAP_HEIGHT) {
+            enemy.direction = -enemy.direction;
+        }
+
+
     });
+
 
     player.x += velocityX;
     player.y += velocityY;
 
     drawCircle(canvas.width / 2, canvas.height / 2, player.radius, player.color);
-    score.textContent = `Score: ${player.radius}`;
+    score.textContent = `Score: ${Math.floor(player.radius)}`;
+
     requestAnimationFrame(update);
 }
 
@@ -120,17 +168,14 @@ canvas.addEventListener('mousemove', (event) => {
     let mouseX = event.clientX - bounds.left;
     let mouseY = event.clientY - bounds.top;
 
-    // マウスとプレイヤーとのxおよびyの差を計算します。
     let diffX = mouseX - canvas.width / 2;
     let diffY = mouseY - canvas.height / 2;
 
-    // マウスとプレイヤーとの距離を計算します。
     let distance = Math.sqrt(diffX * diffX + diffY * diffY);
 
-    // 移動の最大速度を設定します。
     const maxSpeed = 5;
 
-    // 距離を0からmaxSpeedにマッピングします。
+    // 距離を0からmaxSpeedにマッピング
     let speedFactor = Math.min(distance / (player.radius + 50), 1); // 1を超えないように制限します。
 
     velocityX = diffX / distance * speedFactor * maxSpeed;
@@ -139,6 +184,11 @@ canvas.addEventListener('mousemove', (event) => {
 
 
 setInterval(addRandomFood, 5000); // 5000ミリ秒 = 5秒
-
+setInterval(() => {
+    enemies.forEach(enemy => {
+        enemy.direction = Math.random() * Math.PI * 2;
+    });
+}, 5000);
 
 update();
+

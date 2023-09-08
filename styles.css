@@ -6,6 +6,18 @@ body {
     background-color: #eee;
 }
 
+.canvas-wrapper {
+    display: flex;
+    flex-direction: column;  /* 縦方向に要素を並べます。 */
+    align-items: center;     /* 中央寄せを行います。 */
+}
+
 canvas {
     border: 1px solid #000;
+    margin-top: 10px;       /* pタグとの間に少しスペースを空けます。 */
+}
+
+p {
+    color: fuchsia;
+    margin: 0;               /* pタグのデフォルトのマージンを取り除きます。 */
 }
