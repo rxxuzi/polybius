@@ -31,6 +31,16 @@ let player = {
     color: 'blue',
 };
 
+let players = [{
+    x: MAP_WIDTH / 2,
+    y: MAP_HEIGHT / 2,
+    radius: START_PLAYER_SIZE,
+    targetRadius: START_PLAYER_SIZE,
+    color: 'blue',
+    velocityX: 0,
+    velocityY: 0
+}];
+
 const enemies = [];
 
 const MAX_SPEED = 10;
@@ -85,6 +95,11 @@ function checkCollision(circle1, circle2) {
     return distance < circle1.radius + circle2.radius;
 }
 
+function isOutsideBounds(x, y, radius) {
+    return x - radius < 0 || x + radius > MAP_WIDTH || y - radius < 0 || y + radius > MAP_HEIGHT;
+}
+
+
 
 function drawGrid() {
     ctx.strokeStyle = 'rgba(0,0,0,0.2)';
@@ -130,32 +145,59 @@ function update() {
         drawCircle(enemy.x - player.x + canvas.width / 2, enemy.y - player.y + canvas.height / 2, enemy.radius, enemy.color);
 
         if (checkCollision(player, enemy)) {
-            if (player.radius > enemy.radius) {
-                player.targetRadius += enemy.radius; // targetRadiusを増やす
-                enemies.splice(index, 1);
-            } else {
-                location.reload();
+            const scoreRate = 0.5
+            if(enemy.radius > 30){
+                if (player.radius > enemy.radius) {
+                    player.targetRadius += enemy.radius * scoreRate;
+                    enemies.splice(index, 1);
+                } else {
+                    location.reload();
+                }
+            }else {
+                if (player.radius > enemy.radius + 10) {
+                    player.targetRadius += enemy.radius * scoreRate;
+                    enemies.splice(index, 1);
+                } else if(player.radius <= enemy.radius - 5){
+                    location.reload();
+                }
             }
+
         }
 
-        //move
-        enemy.x += Math.cos(enemy.direction) * enemy.speed;
-        enemy.y += Math.sin(enemy.direction) * enemy.speed;
+        // Move the enemy
+        let newEnemyX = enemy.x + Math.cos(enemy.direction) * enemy.speed;
+        let newEnemyY = enemy.y + Math.sin(enemy.direction) * enemy.speed;
 
-        // 敵が画面の境界に達したら、方向を反転
-        if (enemy.x < 0 || enemy.x > MAP_WIDTH) {
+        // If the new position will take the enemy outside the bounds, reflect the direction
+        if (newEnemyX - enemy.radius < 0 || newEnemyX + enemy.radius > MAP_WIDTH) {
             enemy.direction = Math.PI - enemy.direction;
         }
-        if (enemy.y < 0 || enemy.y > MAP_HEIGHT) {
+        if (newEnemyY - enemy.radius < 0 || newEnemyY + enemy.radius > MAP_HEIGHT) {
             enemy.direction = -enemy.direction;
         }
 
-
+        // Update the enemy's position using the possibly modified direction
+        enemy.x += Math.cos(enemy.direction) * enemy.speed;
+        enemy.y += Math.sin(enemy.direction) * enemy.speed;
     });
 
 
-    player.x += velocityX;
-    player.y += velocityY;
+
+    // Update player's position
+    let newPlayerX = player.x + velocityX;
+    let newPlayerY = player.y + velocityY;
+
+    // If the new position will take the player outside the bounds, reflect the velocity
+        if (newPlayerX - player.radius < 0 || newPlayerX + player.radius > MAP_WIDTH) {
+            velocityX = -velocityX;
+        }
+        if (newPlayerY - player.radius < 0 || newPlayerY + player.radius > MAP_HEIGHT) {
+            velocityY = -velocityY;
+        }
+
+    // Update the player's position using the possibly modified velocities
+        player.x += velocityX;
+        player.y += velocityY;
 
     drawCircle(canvas.width / 2, canvas.height / 2, player.radius, player.color);
     score.textContent = `Score: ${Math.floor(player.radius)}`;
@@ -181,6 +223,39 @@ canvas.addEventListener('mousemove', (event) => {
     velocityX = diffX / distance * speedFactor * maxSpeed;
     velocityY = diffY / distance * speedFactor * maxSpeed;
 });
+
+document.addEventListener('keydown', (e) => {
+    if (e.code === "Space") {
+        for (let i = players.length - 1; i >= 0; i--) {
+            let player = players[i];
+
+            if (player.radius >= 50) {
+                let newRadius = player.radius / 2;
+
+                // 新しいplayerオブジェクトを作成
+                let newPlayer = {
+                    x: player.x + (player.velocityX * newRadius),
+                    y: player.y + (player.velocityY * newRadius),
+                    radius: newRadius,
+                    targetRadius: newRadius,
+                    color: 'blue',
+                    velocityX: player.velocityX,
+                    velocityY: player.velocityY
+                };
+
+                // 元のplayerのradiusを半分にし、位置も変更
+                player.radius = newRadius;
+                player.targetRadius = newRadius;
+                player.x -= (player.velocityX * newRadius);
+                player.y -= (player.velocityY * newRadius);
+
+                players.push(newPlayer);
+            }
+        }
+    }
+});
+
+
 
 
 setInterval(addRandomFood, 5000); // 5000ミリ秒 = 5秒
