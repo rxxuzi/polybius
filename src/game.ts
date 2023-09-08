@@ -7,10 +7,10 @@ let isRotatingRight = false;
 const rotationSpeed = Math.PI / 135; // 1フレームあたりの回転速度（1度をラジアンに変換）。現在は2度/フレーム
 
 
-function drawOctagon(x: number, y: number, radius: number) {
+function drawOctagon(x: number, y: number, radius: number, angleOffset: number = 0) {
     ctx.beginPath();
     for (let i = 0; i < 8; i++) {
-        let angle = Math.PI / 4 * i + rotationAngle; // ここにrotationAngleを追加
+        let angle = Math.PI / 4 * i + rotationAngle + angleOffset; // angleOffsetを加算
         let xOffset = radius * Math.cos(angle);
         let yOffset = radius * Math.sin(angle);
         if (i === 0) {
@@ -20,42 +20,66 @@ function drawOctagon(x: number, y: number, radius: number) {
         }
     }
     ctx.closePath();
-    ctx.strokeStyle = "lime"; // ネオン色
+    ctx.strokeStyle = "lime";
     ctx.lineWidth = 3;
     ctx.stroke();
 }
+
+
 function drawTubeSegment(segment: TubeSegment, state: GameState) {
     const scaleFactor = 300 / (segment.depth + 300);
-    const scaledRadius = 300 * scaleFactor;
-    drawOctagon(canvas.width / 2, canvas.height / 2, scaledRadius);
+    const scaledRadius = 300 * scaleFactor * 2; // スケールファクタを2倍にして遠近効果を強化
+
+    let segmentRotation = rotationAngle;
+
+    switch (segment.curveDirection) {
+        case 'left':
+            segmentRotation += rotationSpeed;
+            break;
+        case 'right':
+            segmentRotation -= rotationSpeed;
+            break;
+    }
+
+    ctx.fillStyle = `rgba(100, 255, 100, ${scaleFactor})`; // 深度に基づくアルファを持つ色を設定
+    drawOctagon(canvas.width / 2, canvas.height / 2, scaledRadius, segmentRotation);
+    ctx.fill();
 }
+
 
 class TubeSegment {
     depth: number;
+    curveDirection: 'left' | 'right' | 'straight';
 
-    constructor(depth: number) {
+    constructor(depth: number, curveDirection: 'left' | 'right' | 'straight' = 'straight') {
         this.depth = depth;
+        this.curveDirection = curveDirection;
     }
 }
+
 
 function isVisible(scaleFactor: number): boolean {
     return scaleFactor >= 0.01; // scaleFactorが非常に小さい場合、セグメントは表示されないと判断
 }
 
 class GameState {
+
     segments: TubeSegment[] = [];
     rotationAngle: number = 0;
     vanishingPoint: { x: number, y: number }[] = [];
     maxDepth: number;
-
     constructor(numSegments: number, maxDepth: number) {
         this.maxDepth = maxDepth;
         const depthPerSegment = maxDepth / numSegments;
 
+        const curveDirections: ('left' | 'right' | 'straight')[] = ['left', 'right', 'straight'];
+
         for (let i = 1; i <= numSegments; i++) {
-            this.segments.push(new TubeSegment(i * depthPerSegment));
+            const randomDirection = curveDirections[Math.floor(Math.random() * curveDirections.length)];
+            this.segments.push(new TubeSegment(i * depthPerSegment, randomDirection));
         }
     }
+
 }
 
 function updateTube(state: GameState) {
@@ -85,8 +109,6 @@ function updateTube(state: GameState) {
     }
 }
 
-
-
 function gameLoop(state: GameState) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -98,9 +120,10 @@ function gameLoop(state: GameState) {
 
 function drawTube(state: GameState) {
     for (const segment of state.segments) {
-        drawTubeSegment(segment, state); // 2つの引数を提供
+        drawTubeSegment(segment, state);  // ここを修正
     }
 }
+
 document.addEventListener('keydown', (e) => {
     switch (e.key) {
         case 'a':
@@ -126,8 +149,6 @@ document.addEventListener('keyup', (e) => {
             break;
     }
 });
-
-
 
 // ゲームを初期化して開始する関数
 function startGame() {
